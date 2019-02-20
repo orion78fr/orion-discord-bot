@@ -1,39 +1,41 @@
-extern crate discord;
+extern crate serenity;
 
 use std::env;
 
-use discord::Discord;
-use discord::model::Event;
+use serenity::{
+    model::{channel::Message, gateway::Ready},
+    prelude::*,
+};
+
+struct Handler;
+
+impl EventHandler for Handler {
+    fn message(&self, ctx: Context, msg: Message) {
+        if msg.content == "!test" {
+            // Sending a message can fail, due to a network error, an
+            // authentication error, or lack of permissions to post in the
+            // channel, so log to stdout when some error happens, with a
+            // description of it.
+            if let Err(why) = msg.channel_id.say("It works !") {
+                println!("Error sending message : {:?}", why);
+            }
+        } else if message.content == "!exit" {
+            println!("Received exit command, exiting...");
+            ctx.quit();
+        }
+    }
+
+    fn ready(&self, _: Context, ready: Ready) {
+        println!("{} is connected and ready to receive messages !", ready.user.name);
+    }
+}
 
 fn main() {
     // Authenticate with discord
     let token = &env::var("DISCORD_TOKEN").expect("Expected token in DISCORD_TOKEN");
-    let discord = Discord::from_bot_token(token).expect("Login failed, please check your token");
 
-    // Get websocket connection
-    let (mut connection, _) = discord.connect().expect("Connect failed");
-
-    println!("Ready to receive messages !");
-
-    // Loop through the events
-    loop {
-        match connection.recv_event() {
-            Ok(Event::MessageCreate(message)) => {
-                println!("{} says: {}", message.author.name, message.content);
-                if message.content == "!test" {
-                    let _ = discord.send_message(message.channel_id,
-                                                 "It works !", "", false);
-                } else if message.content == "!quit" {
-                    println!("Quitting.");
-                    break
-                }
-            }
-            Ok(_) => {}
-            Err(discord::Error::Closed(code, body)) => {
-                println!("Gateway closed on us with code {:?}: {}", code, body);
-                break
-            }
-            Err(err) => println!("Receive error: {:?}", err)
-        }
+    let mut client = Client::new(&token, Handler).expect("Err creating client");
+    if let Err(why) = client.start() {
+        println!("Client error: {:?}", why);
     }
 }

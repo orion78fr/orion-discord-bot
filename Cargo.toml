@@ -4,5 +4,6 @@ version = "0.1.0"
 authors = ["TURCHINI GUILLAUME <orion78fr@gmail.com>"]
 edition = "2018"
 
-[dependencies]
-discord = "0.8.0"
+[dependencies.discord]
+version = "0.8.0"
+features = []

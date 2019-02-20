@@ -5,5 +5,5 @@ authors = ["TURCHINI GUILLAUME <orion78fr@gmail.com>"]
 edition = "2018"
 
 [dependencies.discord]
-version = "0.8.0"
+git = "https://github.com/SpaceManiac/discord-rs"
 default-features = false

@@ -19,7 +19,7 @@ impl EventHandler for Handler {
             if let Err(why) = msg.channel_id.say("It works !") {
                 println!("Error sending message : {:?}", why);
             }
-        } else if message.content == "!exit" {
+        } else if msg.content == "!exit" {
             println!("Received exit command, exiting...");
             ctx.quit();
         }
@@ -34,7 +34,7 @@ fn main() {
     // Authenticate with discord
     let token = &env::var("DISCORD_TOKEN").expect("Expected token in DISCORD_TOKEN");
 
-    let mut client = Client::new(&token, Handler).expect("Err creating client");
+    let mut client = Client::new(&token, Handler).expect("Error creating client");
     if let Err(why) = client.start() {
         println!("Client error: {:?}", why);
     }

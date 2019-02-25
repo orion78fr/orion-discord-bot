@@ -1,18 +1,25 @@
+extern crate pest;
+#[macro_use]
+extern crate pest_derive;
 extern crate serenity;
+
+mod parser;
+
+use crate::parser::parse_message;
 
 use std::{env, sync::Arc};
 
 use serenity::{
     client::bridge::gateway::ShardManager,
-    model::{channel::Message, gateway::Ready, id::UserId},
+    model::{channel::Message, channel::ReactionType, gateway::Ready, id::UserId},
     prelude::*,
     utils::MessageBuilder,
 };
 
-struct CurrentUserId;
+struct CurrentUser;
 
-impl TypeMapKey for CurrentUserId {
-    type Value = UserId;
+impl TypeMapKey for CurrentUser {
+    type Value = (UserId, String, u16);
 }
 
 struct ShardManagerContainer;
@@ -29,8 +36,8 @@ impl EventHandler for Handler {
 
         {
             let data = ctx.data.lock();
-            current_user_id = match data.get::<CurrentUserId>() {
-                Some(id) => id.clone(),
+            current_user_id = match data.get::<CurrentUser>() {
+                Some((id, _,_)) => id.clone(),
                 None => return
             }
         }
@@ -40,42 +47,49 @@ impl EventHandler for Handler {
             return;
         }
 
-        if !msg.mentions_user_id(current_user_id) {
+        if !msg.mentions_user_id(current_user_id) && !msg.is_private() {
             // We only react on mentions to us, thus we don't have any incompatibility to other bots
+            // Or direct messages
             return;
         }
 
-        // Just answer to the user
-        let channel = match msg.channel_id.to_channel() {
-            Ok(channel) => channel,
-            Err(why) => {
-                println!("Error getting channel: {:?}", why);
+        // Parse the args
+        let safe_msg_content = msg.content_safe();
+        let parsed = parse_message(&safe_msg_content);
 
-                return;
+        if parsed.is_err() {
+            // Error while parsing, mark the message and return
+            if let Err(why) = msg.react(ReactionType::Unicode(String::from("❌"))) {
+                println!("Error reacting to message : {:?}", why);
             }
-        };
+            return;
+        } else {
+            if let Err(why) = msg.react(ReactionType::Unicode(String::from("✅"))) {
+                println!("Error reacting to message : {:?}", why);
+            }
+        }
 
-        let response = MessageBuilder::new()
-            .push("User ")
-            .mention(&msg.author)
-            .push(" mentioned me in the ")
-            .mention(&channel)
-            .push(" channel of the guild \"")
-            .push_safe(&channel.guild().unwrap().read().guild().unwrap().read().name)
-            .push("\" with the message ")
+        let mut response = MessageBuilder::new()
+            .push("Message ")
             .push_mono_safe(&msg.content_safe())
-            .build();
+            .push(" parsed to : \n");
 
-        if let Err(why) = msg.channel_id.say(response) {
+        for elem in parsed.unwrap() {
+            response = response.push_codeblock_safe(elem, None).push("\n");
+        }
+
+        if let Err(why) = msg.channel_id.say(response.build()) {
             println!("Error sending message : {:?}", why);
         }
     }
 
     fn ready(&self, ctx: Context, ready: Ready) {
-        println!("{}#{} is connected and ready to receive messages !",
-                 ready.user.name, ready.user.discriminator);
+        let user = ready.user;
 
-        ctx.data.lock().insert::<CurrentUserId>(ready.user.id);
+        println!("{}#{} is connected and ready to receive messages !",
+                 user.name, user.discriminator);
+
+        ctx.data.lock().insert::<CurrentUser>((user.id, user.name, user.discriminator));
     }
 }
 

@@ -47,4 +47,19 @@ mod tests {
         assert_eq!(parse_message("a bb \"c c\" ddd \"e\" f"),
                    Ok(vec!("a", "bb", "c c", "ddd", "e", "f")));
     }
+
+    #[test]
+    fn err_not_closed() {
+        assert!(parse_message("a \"b").is_err());
+    }
+
+    #[test]
+    fn err_not_opened() {
+        assert!(parse_message("a b\"").is_err());
+    }
+
+    #[test]
+    fn err_illegal_char() {
+        assert!(parse_message("a \"b\nb\"").is_err());
+    }
 }

@@ -7,6 +7,6 @@ edition = "2018"
 [dependencies]
 pest = "2.1"
 pest_derive = "2.1"
-
-[dependencies.serenity]
-version = "0.5"
+serenity = "0.5"
+serde = "1.0.88"
+ron = "0.4.1"

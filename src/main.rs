@@ -1,6 +1,9 @@
 extern crate pest;
 #[macro_use]
 extern crate pest_derive;
+extern crate ron;
+#[macro_use]
+extern crate serde;
 extern crate serenity;
 
 use std::{env, sync::Arc};
@@ -15,6 +18,8 @@ use serenity::model::event::PresenceUpdateEvent;
 
 use game::model::GameData;
 use parser::parse_message;
+
+use crate::game::save;
 
 mod parser;
 mod game;
@@ -94,12 +99,15 @@ impl EventHandler for Handler {
     }
 
     fn presence_update(&self, ctx: Context, new_data: PresenceUpdateEvent) {
-        let user_id = new_data.presence.user_id;
-        let new_status = new_data.presence.status;
+        let mut data = ctx.data.lock();
+        let game_data = data.get_mut::<GameDataContainer>().unwrap();
 
-        ctx.data.lock().get_mut::<GameDataContainer>().unwrap().update_presence(&new_data.presence);
+        game_data.update_presence(&new_data.presence);
 
-        //game_data.update(&new_data.presence);
+        match save(GAME_DATA, game_data) {
+            Err(why) => println!("Cannot save game data ! {}", why),
+            _ => {}
+        }
     }
 
     fn ready(&self, ctx: Context, ready: Ready) {
@@ -112,13 +120,15 @@ impl EventHandler for Handler {
     }
 }
 
+const GAME_DATA: &str = "./data.ron";
+
 fn main() {
     // Authenticate with discord
     let token = &env::var("DISCORD_TOKEN").expect("Expected token in DISCORD_TOKEN");
     let mut client = Client::new(&token, Handler).expect("Error creating client");
 
-    let game_data = match game::load("./data.ron") {
-        Ok(data) => data,
+    let game_data = match game::load(GAME_DATA) {
+        Ok(data) => dbg!(data),
         Err(why) => {
             println!("Cannot load data, creating new : {}", why);
             GameData::new()

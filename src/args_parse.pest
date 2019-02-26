@@ -1,6 +1,8 @@
-token = { LETTER+ }
-token_with_spaces = { (LETTER | " ")+ }
+token_content = _{ !"\"" ~ (LETTER | NUMBER | PUNCTUATION | SYMBOL)}
+
+token = { token_content+ }
+token_with_spaces = { (token_content | " ")+ }
 
 quoted_token = _{ "\"" ~ token_with_spaces ~ "\"" }
 
-line = _{ SOI ~ (quoted_token | token) ~ (" " ~ (quoted_token | token))* ~ EOI }
+line = _{ SOI ~ " "* ~ (quoted_token | token) ~ (" "+ ~ (quoted_token | token))* ~ EOI }

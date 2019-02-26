@@ -49,6 +49,16 @@ mod tests {
     }
 
     #[test]
+    fn multiple_spaces() {
+        assert_eq!(parse_message("a   b"), Ok(vec!("a", "b")));
+    }
+
+    #[test]
+    fn symbols() {
+        assert_eq!(parse_message("@t3$t_ t3st2"), Ok(vec!("@t3$t_", "t3st2")));
+    }
+
+    #[test]
     fn err_not_closed() {
         assert!(parse_message("a \"b").is_err());
     }

@@ -59,6 +59,7 @@ impl EventHandler for Handler {
 
         if parsed.is_err() {
             // Error while parsing, mark the message and return
+            println!("Error parsing : {}", parsed.unwrap_err());
             if let Err(why) = msg.react(ReactionType::Unicode(String::from("❌"))) {
                 println!("Error reacting to message : {:?}", why);
             }

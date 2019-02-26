@@ -3,10 +3,6 @@ extern crate pest;
 extern crate pest_derive;
 extern crate serenity;
 
-mod parser;
-
-use crate::parser::parse_message;
-
 use std::{env, sync::Arc};
 
 use serenity::{
@@ -15,6 +11,13 @@ use serenity::{
     prelude::*,
     utils::MessageBuilder,
 };
+use serenity::model::event::PresenceUpdateEvent;
+
+use game::model::GameData;
+use parser::parse_message;
+
+mod parser;
+mod game;
 
 struct CurrentUser;
 
@@ -28,6 +31,12 @@ impl TypeMapKey for ShardManagerContainer {
     type Value = Arc<Mutex<ShardManager>>;
 }
 
+struct GameDataContainer;
+
+impl TypeMapKey for GameDataContainer {
+    type Value = GameData;
+}
+
 struct Handler;
 
 impl EventHandler for Handler {
@@ -37,7 +46,7 @@ impl EventHandler for Handler {
         {
             let data = ctx.data.lock();
             current_user_id = match data.get::<CurrentUser>() {
-                Some((id, _,_)) => id.clone(),
+                Some((id, _, _)) => id.clone(),
                 None => return
             }
         }
@@ -84,6 +93,15 @@ impl EventHandler for Handler {
         }
     }
 
+    fn presence_update(&self, ctx: Context, new_data: PresenceUpdateEvent) {
+        let user_id = new_data.presence.user_id;
+        let new_status = new_data.presence.status;
+
+        ctx.data.lock().get_mut::<GameDataContainer>().unwrap().update_presence(&new_data.presence);
+
+        //game_data.update(&new_data.presence);
+    }
+
     fn ready(&self, ctx: Context, ready: Ready) {
         let user = ready.user;
 
@@ -97,12 +115,20 @@ impl EventHandler for Handler {
 fn main() {
     // Authenticate with discord
     let token = &env::var("DISCORD_TOKEN").expect("Expected token in DISCORD_TOKEN");
-
     let mut client = Client::new(&token, Handler).expect("Error creating client");
+
+    let game_data = match game::load("./data.ron") {
+        Ok(data) => data,
+        Err(why) => {
+            println!("Cannot load data, creating new : {}", why);
+            GameData::new()
+        }
+    };
 
     {
         let mut data = client.data.lock();
         data.insert::<ShardManagerContainer>(Arc::clone(&client.shard_manager));
+        data.insert::<GameDataContainer>(game_data);
     }
 
     // Start the bot

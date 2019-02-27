@@ -9,6 +9,7 @@ use std::io::Write;
 pub mod model;
 
 pub fn save(path: &str, data: &GameData) -> Result<(), String> {
+    println!("Saving data...");
     let mut f = match File::create(path) {
         Ok(f) => f,
         Err(why) => return Err(why.to_string())

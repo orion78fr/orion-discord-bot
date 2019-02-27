@@ -47,11 +47,17 @@ struct Handler;
 impl EventHandler for Handler {
     fn message(&self, ctx: Context, msg: Message) {
         let current_user_id;
+        let current_user_name;
+        let current_user_discriminator;
 
         {
             let data = ctx.data.lock();
-            current_user_id = match data.get::<CurrentUser>() {
-                Some((id, _, _)) => id.clone(),
+            match data.get::<CurrentUser>() {
+                Some((id, name, disc)) => {
+                    current_user_id = id.clone();
+                    current_user_name = name.clone();
+                    current_user_discriminator = disc.clone();
+                }
                 None => return
             }
         }
@@ -69,7 +75,9 @@ impl EventHandler for Handler {
 
         // Parse the args
         let safe_msg_content = msg.content_safe();
-        let parsed = parse_message(&safe_msg_content);
+        let parsed = parse_message(&safe_msg_content,
+                                   // Remove the mention from the args
+                                   Some(format!("@{}#{}", current_user_name, current_user_discriminator)));
 
         if parsed.is_err() {
             // Error while parsing, mark the message and return
@@ -103,7 +111,6 @@ impl EventHandler for Handler {
         let game_data = data.get_mut::<GameDataContainer>().unwrap();
 
         game_data.update_presence(&new_data.presence);
-
         match save(GAME_DATA, game_data) {
             Err(why) => println!("Cannot save game data ! {}", why),
             _ => {}

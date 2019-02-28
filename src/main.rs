@@ -175,11 +175,19 @@ fn main() {
     }
 
     thread::spawn(move || {
+        let mut i: u64 = 0;
         loop {
             {
                 game_data.lock().update();
             }
+            i += 1;
             thread::sleep(Duration::from_secs(1));
+            if i % 10 == 0 {
+                match save(GAME_DATA, &game_data.lock()) {
+                    Err(why) => println!("Cannot save game data ! {}", why),
+                    _ => {}
+                }
+            }
         }
     });
 

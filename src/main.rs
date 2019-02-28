@@ -7,14 +7,16 @@ extern crate serde;
 extern crate serenity;
 
 use std::{env, sync::Arc};
+use std::thread;
+use std::time::Duration;
 
 use serenity::{
     client::bridge::gateway::ShardManager,
     model::{channel::Message, channel::ReactionType, gateway::Ready, id::UserId},
     prelude::*,
-    utils::MessageBuilder,
 };
 use serenity::model::event::PresenceUpdateEvent;
+use serenity::utils::MessageBuilder;
 
 use game::model::GameData;
 use parser::parse_message;
@@ -39,10 +41,16 @@ impl TypeMapKey for ShardManagerContainer {
 struct GameDataContainer;
 
 impl TypeMapKey for GameDataContainer {
-    type Value = GameData;
+    type Value = Arc<Mutex<GameData>>;
 }
 
 struct Handler;
+
+pub enum Answer {
+    Message(String),
+    Reaction(ReactionType),
+    None,
+}
 
 impl EventHandler for Handler {
     fn message(&self, ctx: Context, msg: Message) {
@@ -82,36 +90,54 @@ impl EventHandler for Handler {
         if parsed.is_err() {
             // Error while parsing, mark the message and return
             println!("Error parsing : {}", parsed.unwrap_err());
-            if let Err(why) = msg.react(ReactionType::Unicode(String::from("❌"))) {
+            if let Err(why) = msg.react(ReactionType::Unicode(String::from("💥"))) {
                 println!("Error reacting to message : {:?}", why);
             }
             return;
-        } else {
-            if let Err(why) = msg.react(ReactionType::Unicode(String::from("✅"))) {
-                println!("Error reacting to message : {:?}", why);
+        }
+
+        let parsed = parsed.unwrap();
+
+        let mut data = ctx.data.lock();
+        let mut game_data = data.get_mut::<GameDataContainer>().unwrap().lock();
+
+        let answer = match parsed[0] {
+            "join" => game_data.new_player(msg.author.id.0),
+            "status" => game_data.get_status(msg.author.id.0),
+            _ => Answer::Reaction(ReactionType::Unicode(String::from("❌")))
+        };
+
+        match answer {
+            Answer::Message(m) => {
+                if msg.is_private() {
+                    if let Err(why) = msg.channel_id.say(m) {
+                        println!("Error answering to message : {:?}", why);
+                    };
+                } else {
+                    if let Err(why) = msg.channel_id.say(MessageBuilder::new()
+                        .mention(&msg.author)
+                        .push(" ")
+                        .push(m)
+                        .build()) {
+                        println!("Error answering to message : {:?}", why);
+                    };
+                }
             }
-        }
-
-        let mut response = MessageBuilder::new()
-            .push("Message ")
-            .push_mono_safe(&msg.content_safe())
-            .push(" parsed to : \n");
-
-        for elem in parsed.unwrap() {
-            response = response.push_codeblock_safe(elem, None).push("\n");
-        }
-
-        if let Err(why) = msg.channel_id.say(response.build()) {
-            println!("Error sending message : {:?}", why);
-        }
+            Answer::Reaction(r) => {
+                if let Err(why) = msg.react(r) {
+                    println!("Error reacting to message : {:?}", why);
+                };
+            }
+            Answer::None => {}
+        };
     }
 
     fn presence_update(&self, ctx: Context, new_data: PresenceUpdateEvent) {
         let mut data = ctx.data.lock();
-        let game_data = data.get_mut::<GameDataContainer>().unwrap();
+        let mut game_data = data.get_mut::<GameDataContainer>().unwrap().lock();
 
         game_data.update_presence(&new_data.presence);
-        match save(GAME_DATA, game_data) {
+        match save(GAME_DATA, &game_data) {
             Err(why) => println!("Cannot save game data ! {}", why),
             _ => {}
         }
@@ -134,19 +160,28 @@ fn main() {
     let token = &env::var("DISCORD_TOKEN").expect("Expected token in DISCORD_TOKEN");
     let mut client = Client::new(&token, Handler).expect("Error creating client");
 
-    let game_data = match game::load(GAME_DATA) {
+    let game_data = Arc::new(Mutex::new(match game::load(GAME_DATA) {
         Ok(data) => dbg!(data),
         Err(why) => {
             println!("Cannot load data, creating new : {}", why);
             GameData::new()
         }
-    };
+    }));
 
     {
         let mut data = client.data.lock();
         data.insert::<ShardManagerContainer>(Arc::clone(&client.shard_manager));
-        data.insert::<GameDataContainer>(game_data);
+        data.insert::<GameDataContainer>(Arc::clone(&game_data));
     }
+
+    thread::spawn(move || {
+        loop {
+            {
+                game_data.lock().update();
+            }
+            thread::sleep(Duration::from_secs(1));
+        }
+    });
 
     // Start the bot
     if let Err(why) = client.start() {

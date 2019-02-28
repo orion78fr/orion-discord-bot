@@ -1,10 +1,10 @@
 use std::fs::File;
+use std::io::Write;
 
 use ron::de::from_reader;
 use ron::ser::to_string;
 
 use model::GameData;
-use std::io::Write;
 
 pub mod model;
 

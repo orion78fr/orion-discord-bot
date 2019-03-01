@@ -44,6 +44,28 @@ impl GameData {
         self.points.iter_mut()
             .for_each(|(_, (points, speed))| *points += *speed);
     }
+
+    pub fn gamble(&mut self, user_id: u64, amount: u64) -> Answer {
+        if !self.points.contains_key(&user_id) {
+            return Answer::Message(format!("User {} not found", user_id));
+        }
+
+        let (points, speed) = self.points.get(&user_id).unwrap();
+
+        if *points < amount {
+            return Answer::Message(format!("Not enough currency (you currently have {})", points));
+        }
+
+        let rd: f64 = rand::random();
+
+        if rd < 0.45 {
+            self.points.insert(user_id, (points + amount, *speed));
+            Answer::Message(format!("Cool ! You won {} points", amount))
+        } else {
+            self.points.insert(user_id, (points - amount, *speed));
+            Answer::Message(format!("Too bad ! You lost {} points", amount))
+        }
+    }
 }
 
 fn cur_ts() -> u64 {

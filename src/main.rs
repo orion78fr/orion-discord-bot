@@ -104,6 +104,16 @@ impl EventHandler for Handler {
         let answer = match parsed[0] {
             "join" => game_data.new_player(msg.author.id.0),
             "status" => game_data.get_status(msg.author.id.0),
+            "gamble" => {
+                if parsed.len() < 2 {
+                    Answer::Message(String::from("💥 Usage : gamble <amount>"))
+                } else {
+                    match parsed[1].parse::<u64>() {
+                        Ok(value) => game_data.gamble(msg.author.id.0, value),
+                        Err(why) => Answer::Message(format!("💥 Usage : gamble <amount> ({})", why))
+                    }
+                }
+            }
             _ => Answer::Reaction(ReactionType::Unicode(String::from("❌")))
         };
 

@@ -1,3 +1,2 @@
 # Orion Discord Bot
 A small discord bot made in rust, it'll probably be poorly coded, misuses its dependencies etc...  
-If you still want to help, feel free to open an issue or a pull request.
